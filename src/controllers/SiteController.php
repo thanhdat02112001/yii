@@ -9,51 +9,11 @@ use yii\web\Response;
 use yii\filters\VerbFilter;
 use app\models\LoginForm;
 use app\models\ContactForm;
+use app\models\Posts;
 
 class SiteController extends Controller
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function behaviors()
-    {
-        return [
-            'access' => [
-                'class' => AccessControl::class,
-                'only' => ['logout'],
-                'rules' => [
-                    [
-                        'actions' => ['logout'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                ],
-            ],
-            'verbs' => [
-                'class' => VerbFilter::class,
-                'actions' => [
-                    'logout' => ['post'],
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function actions()
-    {
-        return [
-            'error' => [
-                'class' => 'yii\web\ErrorAction',
-            ],
-            'captcha' => [
-                'class' => 'yii\captcha\CaptchaAction',
-                'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
-            ],
-        ];
-    }
-
+   
     /**
      * Displays homepage.
      *
@@ -61,68 +21,57 @@ class SiteController extends Controller
      */
     public function actionIndex()
     {
-        return $this->render('index');
+        $posts = Posts::find()->all();
+        return $this->render('index', ['posts' => $posts]);
     }
 
-    /**
-     * Login action.
-     *
-     * @return Response|string
-     */
-    public function actionLogin()
+    public function actionCreate()
     {
-        if (!Yii::$app->user->isGuest) {
-            return $this->goHome();
+        $post = new Posts();
+        $request = Yii::$app->request;
+        if ($post->load($request->post()) && $post->validate()) {
+            $post->title = $post['title'];
+            $post->content = $post['content'];
+            $post->save();
+            return $this->redirect(['site/index']);
+        } else {
+            // either the page is initially displayed or there is some validation error
+            return $this->render('create', ['post' => $post]);
         }
+    }
 
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
+    public function actionUpdate($id = NULL){
+        $post = new Posts();
+        $currenPost = Posts::findOne($id); 
+        $request = Yii::$app->request;
+        if ($post->load($request->post()) && $post->validate()) {
+            $currenPost->title = $post['title'];
+            $currenPost->content = $post['content'];
+            $currenPost->save();
+            return $this->redirect(['site/index']);
         }
-
-        $model->password = '';
-        return $this->render('login', [
-            'model' => $model,
-        ]);
+        return $this->render('update', array(
+            'post' => $currenPost
+        ));
     }
 
-    /**
-     * Logout action.
-     *
-     * @return Response
-     */
-    public function actionLogout()
-    {
-        Yii::$app->user->logout();
-
-        return $this->goHome();
-    }
-
-    /**
-     * Displays contact page.
-     *
-     * @return Response|string
-     */
-    public function actionContact()
-    {
-        $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->contact(Yii::$app->params['adminEmail'])) {
-            Yii::$app->session->setFlash('contactFormSubmitted');
-
-            return $this->refresh();
+    public function actionView($id = NULL){
+        $post = Posts::findOne($id); 
+        if ($post == NULL) {
+            Yii::$app->session->setFlash('error', 'A post with that id does not exist');
+		    Yii::$app->getResponse()->redirect(array('site/index'));
         }
-        return $this->render('contact', [
-            'model' => $model,
-        ]);
+        return $this->render('view', ['post' => $post]);
     }
 
-    /**
-     * Displays about page.
-     *
-     * @return string
-     */
-    public function actionAbout()
-    {
-        return $this->render('about');
+    public function actionDelete($id = NULL) {
+        $post = Posts::findOne($id);
+        if ($post == NULL) {
+            Yii::$app->session->setFlash('error', 'A post with that id does not exist');
+		    Yii::$app->getResponse()->redirect(array('site/index'));
+        }
+        $post->delete();
+        return $this->redirect(['site/index']);
     }
+
 }
